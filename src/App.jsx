@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { FormProvider } from "react-hook-form";
 import useEnrollmentForm from "./form/useEnrollmentForm";
 
-import Step1Personal from "./steps/Step1Personal";
-import Step2Emergency from "./steps/Step2Emergency";
-import Step3Bank from "./steps/Step3Bank";
-import Step4Education from "./steps/Step4Education";
-import Step5Employment from "./steps/Step5Employment";
+import Step1BasicInfo from "./steps/Step1BasicInfo";
+import Step2AcademicDetails from "./steps/Step2AcademicDetails";
+import Step3InternshipPreferences from "./steps/Step3InternshipPreferences";
+import Step4SkillsExperience from "./steps/Step4SkillsExperience";
+import Step5Additional from "./steps/Step5Additional";
 import SuccessCompletion from "./steps/SuccessCompletion";
 import TopBar from "./components/navigations/TopBar";
 import ProgressBar from "./components/navigations/ProgressBar";
@@ -17,58 +17,59 @@ import { Toaster } from "./components/ui/toaster";
 const stepFields = {
   1: [
     "fullName",
-    "address",
-    "homePhone",
+    "gender",
     "email",
-    "panId",
-    "aadharNumber",
-    "birthDate",
-    "maritalStatus",
-    "proof",
+    "phone",
+    "currentLocation",
   ],
 
-  2: [
-    "emergencyFullNameWithInitial",
-    "emergencyStreet",
-    "emergencyState",
-    "emergencyZip",
-    "emergencyPrimaryPhone",
-  ],
 
-  3: [
-    "bankName",
-    "accountHolderName",
-    "accountNumber",
-    "ifscCode",
-    "accountType",
-  ],
+  2: (values) => {
+  const base = ["educationStatus"];
 
-  4: [
-    "education.0.level",
-    "education.0.field",
-    "education.0.institution",
-    "education.0.passingYear",
-    "education.0.grade",
-  ],
+  if (values.educationStatus === "School Student") {
+    return [...base, "schoolRegNumber", "schoolGroup", "schoolName", "schoolAddress", "schoolGraduationYear"];
+  }
+
+  if (values.educationStatus === "College Student" || values.educationStatus === "Recent Graduate") {
+    return [...base, "collegeRegNumber", "courseName", "collegeName", "collegeAddress", "collegeGraduationYear"];
+  }
+
+  return base; // Self-Learner
+},
+
+  3: (values) => {
+  const base = [
+    "internshipDomains",
+    "internshipType",
+    "preferredStartDate",
+    "internshipDuration",
+  ];
+
+  if ((values.internshipDomains || []).includes("Other")) {
+    return [...base, "internshipDomainOther"];
+  }
+
+  return base;
+},
+
+4: [
+  "technicalSkills",
+  "projectDetails",
+  "resume",
+  // profileLink is optional, skip validation
+],
 
   5: (values) => {
-    if (values.employmentType === "fresher") {
-      return ["declaration"];
-    }
- 
-    return [
-      "employment.0.organization",
-      "employment.0.location",
-      "employment.0.workMode",
-      "employment.0.designation",
-      "employment.0.from",
-      "employment.0.to",
-      "employment.0.ctc",
-      "employment.0.payslip",
-      "employment.0.experienceCertificate",
-      "declaration",
-    ];
-  },
+  const base = ["hearAboutUs", "expectations", "declaration"];
+
+  if (values.hearAboutUs === "Other") {
+    return [...base, "hearAboutUsOther"];
+  }
+
+  return base;
+},
+
 };
 
 function App() {
@@ -123,17 +124,16 @@ function App() {
           {/* STEP CONTENT */}
           <form onSubmit={form.handleSubmit(form.onSubmit)}>
             {step === 1 && (
-              <Step1Personal onNext={nextStep} shake={shakeForm} />
+              <Step1BasicInfo onNext={nextStep} shake={shakeForm} />
             )}
             {step === 2 && (
-              <Step2Emergency onNext={nextStep} shake={shakeForm} />
+              <Step2AcademicDetails onNext={nextStep} shake={shakeForm} />
             )}
-            {step === 3 && <Step3Bank onNext={nextStep} shake={shakeForm} />}
-            {step === 4 && (
-              <Step4Education onNext={nextStep} shake={shakeForm} />
+            {step === 3 && <Step3InternshipPreferences onNext={nextStep} shake={shakeForm} />}
+            {step === 4 && (<Step4SkillsExperience onNext={nextStep} shake={shakeForm} />
             )}
             {step === 5 && (
-              <Step5Employment
+              <Step5Additional
                 onNext={nextStep}
                 shake={shakeForm}
                 isSubmitting={form.isSubmitting}
