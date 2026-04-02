@@ -1,138 +1,218 @@
 import * as yup from "yup";
 
 const phoneRegex = /^[6-9]\d{9}$/;
-
-const aadhaarRegex = /^[2-9]{1}[0-9]{3}\s?[0-9]{4}\s?[0-9]{4}$/;
-
-const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-
-const bankAccountRegex = /^[0-9]{9,18}$/;
-
-const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+const urlRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w-./?%&=]*)?$/;
+const alphaNumericRegex = /^[a-zA-Z0-9\s]+$/;
 
 export default yup.object({
-  // STEP 1
-  fullName: yup.string().required("Full name is required"),
-  address: yup.string().required("Address is required"),
-  homePhone: yup
-    .string()
-    .required("Home phone is required")
-    .matches(phoneRegex, "Enter a valid 10-digit phone number"),
-  alternatePhone: yup
-    .string()
-    .required("Alternate Phone is required")
-    .matches(phoneRegex, "Enter a valid 10-digit phone number"),
-  email: yup.string().email("Invalid email").required("Email is required"),
-  panId: yup
-    .string()
-    .required("PAN number is required")
-    .matches(panRegex, "Invalid PAN format (ABCDE1234F)"),
-  aadharNumber: yup
-    .string()
-    .transform((value) => value?.replace(/\s/g, ""))
-    .required("Aadhaar number is required")
-    .matches(aadhaarRegex, "Aadhaar must be exactly 12 digits"),
-  birthDate: yup
-    .date()
-    .typeError("Birth Date is required")
-    .required("Birth Date is required"),
 
-  maritalStatus: yup.string().required("Marital status is required"),
+  // ── STEP 1 : BASIC INFORMATION ──────────────────────────────────────────────
 
-  proof: yup
+  fullName: yup
+    .string()
+    .required("Full name is required"),
+
+  gender: yup
+  .string()
+  .required("Please select a gender")
+  .oneOf(["Male", "Female"], "Please select a valid gender"),
+
+  email: yup
+    .string()
+    .email("Enter a valid email address")
+    .required("Email is required"),
+
+  phone: yup
+    .string()
+    .required("Phone number is required")
+    .matches(phoneRegex, "Enter a valid 10-digit phone number"),
+
+  currentLocation: yup
+    .string()
+    .required("Current location is required"),
+
+  // ── STEP 2 : ACADEMIC DETAILS ────────────────────────────────────────────────
+
+  educationStatus: yup
+    .string()
+    .required("Education status is required"),
+
+  // School fields — only required when educationStatus is "School Student"
+  schoolRegNumber: yup
+    .string()
+    .when("educationStatus", {
+      is: "School Student",
+      then: (schema) =>
+        schema
+          .required("School registration number is required")
+          .matches(alphaNumericRegex, "Only letters and numbers allowed"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  schoolGroup: yup
+    .string()
+    .when("educationStatus", {
+      is: "School Student",
+      then: (schema) => schema.required("Group is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  schoolName: yup
+    .string()
+    .when("educationStatus", {
+      is: "School Student",
+      then: (schema) => schema.required("Institution name is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  schoolAddress: yup
+    .string()
+    .when("educationStatus", {
+      is: "School Student",
+      then: (schema) => schema.required("Institution address is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  schoolGraduationYear: yup
+    .number()
+    .when("educationStatus", {
+      is: "School Student",
+      then: (schema) =>
+        schema
+          .typeError("Enter a valid year")
+          .required("Graduation year is required")
+          .min(2000, "Year must be after 2000")
+          .max(2100, "Enter a valid year"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  // College / Recent Graduate fields
+  collegeRegNumber: yup
+    .string()
+    .when("educationStatus", {
+      is: (val) => val === "College Student" || val === "Recent Graduate",
+      then: (schema) =>
+        schema
+          .required("College registration number is required")
+          .matches(alphaNumericRegex, "Only letters and numbers allowed"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  courseName: yup
+    .string()
+    .when("educationStatus", {
+      is: (val) => val === "College Student" || val === "Recent Graduate",
+      then: (schema) => schema.required("Course / Degree name is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  collegeName: yup
+    .string()
+    .when("educationStatus", {
+      is: (val) => val === "College Student" || val === "Recent Graduate",
+      then: (schema) => schema.required("Institution name is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  collegeAddress: yup
+    .string()
+    .when("educationStatus", {
+      is: (val) => val === "College Student" || val === "Recent Graduate",
+      then: (schema) => schema.required("Institution address is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  collegeGraduationYear: yup
+    .number()
+    .when("educationStatus", {
+      is: (val) => val === "College Student" || val === "Recent Graduate",
+      then: (schema) =>
+        schema
+          .typeError("Enter a valid year")
+          .required("Graduation year is required")
+          .min(2000, "Year must be after 2000")
+          .max(2100, "Enter a valid year"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  // ── STEP 3 : INTERNSHIP PREFERENCES ─────────────────────────────────────────
+
+  internshipDomains: yup
     .array()
-    .min(1, "At least one document is required")
-    .of(yup.mixed())
-    .required("Proof Attached is required")
-    .test(
-      "fileExists",
-      "Proof Attached is required",
-      (value) => value && value.length > 0,
-    ),
+    .of(yup.string())
+    .min(1, "Please select at least one domain")
+    .required("Please select at least one domain"),
 
-  // STEP 2
-
-  emergencyFullNameWithInitial: yup
+  internshipDomainOther: yup
     .string()
-    .required("FullName with Initial is required"),
-  emergencyStreet: yup.string().required("Street Address is required"),
-  emergencyCity: yup.string().nullable(),
-  emergencyState: yup.string().required("State is required"),
-  emergencyZip: yup.string().required("ZIP Code is required"),
-  emergencyPrimaryPhone: yup
-    .string()
-    .required("Primary Phone is required")
-    .matches(phoneRegex, "Enter a valid 10-digit phone number"),
-  emergencyAlternatePhone: yup
-    .string()
-    .matches(phoneRegex, "Enter a valid 10-digit phone number")
-    .nullable(),
-  emergencyRelationship: yup.string().nullable(),
-
-  // STEP 3
-  bankName: yup.string().required("Bank name is required"),
-  accountHolderName: yup.string().required("Account holder name is required"),
-  accountNumber: yup
-    .string()
-    .required("Account number is required")
-    .matches(bankAccountRegex, "Account number must be 9-18 digits"),
-  ifscCode: yup
-    .string()
-    .required("IFSC code is required")
-    .matches(ifscRegex, "Invalid IFSC code"),
-  accountType: yup.string().required("Account type is required"),
-
-  // STEP 4
-  education: yup.array().of(
-    yup.object({
-      level: yup.string().required("Education level is required"),
-
-      field: yup.string().required("Field of study is required"),
-
-      institution: yup.string().required("Institution name is required"),
-
-      location: yup.string().nullable(),
-
-      passingYear: yup.string().required("Passing year is required"),
-
-      grade: yup.string().required("Grade or percentage is required"),
+    .when("internshipDomains", {
+      is: (val) => Array.isArray(val) && val.includes("Other"),
+      then: (schema) => schema.required("Please specify your domain"),
+      otherwise: (schema) => schema.nullable().optional(),
     }),
-  ),
 
-  // STEP 5
-  employment: yup.array().of(
-    yup.object({
-      organization: yup.string().required("Organization name is required"),
+  internshipType: yup
+    .string()
+    .required("Please select an internship type"),
 
-      location: yup.string().required("Organization location is required"),
+  preferredStartDate: yup
+    .date()
+    .typeError("Please select a valid start date")
+    .required("Preferred start date is required")
+    .min(new Date(), "Start date must be in the future"),
 
-      workMode: yup.string().required("Work mode is required"),
+  internshipDuration: yup
+    .string()
+    .required("Please select a preferred duration"),
 
-      designation: yup.string().required("Designation is required"),
+  // ── STEP 4 : SKILLS & EXPERIENCE ─────────────────────────────────────────────
 
-      from: yup
-        .date()
-        .typeError("Start date is required")
-        .required("Start date is required"),
+  technicalSkills: yup
+    .string()
+    .required("Please describe your technical skills")
+    .min(20, "Please provide at least a brief description (20 characters)"),
 
-      to: yup
-        .date()
-        .typeError("End date is required")
-        .required("End date is required")
-        .min(
-          yup.ref("from"),
-          "Service Period To must be after Service Period From",
-        ),
+  projectDetails: yup
+    .string()
+    .required("Please describe your projects")
+    .min(20, "Please provide at least a brief description (20 characters)"),
 
-      ctc: yup.string().required("Monthly CTC is required"),
-
-      payslip: yup.mixed().required("Payslip upload is required"),
-
-      experienceCertificate: yup
-        .mixed()
-        .required("Experience certificate is required"),
+  profileLink: yup
+    .string()
+    .nullable()
+    .optional()
+    .test("valid-url", "Enter a valid URL (e.g. https://github.com/you)", (value) => {
+      if (!value || value.trim() === "") return true; // optional
+      return urlRegex.test(value);
     }),
-  ),
 
-  declaration: yup.boolean().oneOf([true], "You must accept the declaration"),
+  resume: yup
+    .mixed()
+    .required("Please upload your resume or portfolio")
+    .test("fileExists", "Please upload your resume or portfolio", (value) => {
+      return value && Array.isArray(value) && value.length > 0;
+    }),
+
+  // ── STEP 5 : ADDITIONAL INFORMATION ──────────────────────────────────────────
+
+  hearAboutUs: yup
+    .string()
+    .required("Please tell us how you heard about us"),
+
+  hearAboutUsOther: yup
+    .string()
+    .when("hearAboutUs", {
+      is: "Other",
+      then: (schema) => schema.required("Please specify how you heard about us"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
+  expectations: yup
+    .string()
+    .required("Please share your expectations or goals")
+    .min(20, "Please provide at least a brief description (20 characters)"),
+
+  declaration: yup
+    .boolean()
+    .oneOf([true], "You must accept the acknowledgement before submitting"),
 });
