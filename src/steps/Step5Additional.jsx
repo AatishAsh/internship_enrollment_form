@@ -147,7 +147,16 @@ const Step5Additional = ({ onNext, shake, isSubmitting }) => {
                 className="w-5 h-5 mt-0.5 accent-white bg-[#0f0f0f] cursor-pointer flex-shrink-0"
               />
               <span className="text-gray-300 text-sm leading-relaxed group-hover:text-white transition-colors">
-                I agree to the Terms and Conditions and acknowledge that I have read the privacy policy.
+                I agree to the{" "}
+                <a
+                  href="/terms-and-conditions"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 transition-colors font-medium underline"
+                >
+                  Terms and Conditions
+                </a>
+                {" "}and acknowledge that I have read the privacy policy.
               </span>
             </label>
 
