@@ -23,6 +23,7 @@ const Step5Additional = ({ onNext, shake, isSubmitting }) => {
   const hearAboutUs = useWatch({ control, name: "hearAboutUs" });
   const isOther = hearAboutUs === "Other";
   const declaration = useWatch({ control, name: "declaration" });
+  const termsAccepted = useWatch({ control, name: "termsAccepted" });
 
   return (
     <div className="min-h-screen bg-[#000001] text-white overflow-x-hidden">
@@ -122,14 +123,37 @@ const Step5Additional = ({ onNext, shake, isSubmitting }) => {
               />
               <span className="text-gray-300 text-sm leading-relaxed group-hover:text-white transition-colors">
                 I confirm that all information provided above is accurate and
-                truthful and I understand this is a learning-based internship
-                and may not include monetary compensation.
+                truthful.
               </span>
             </label>
 
             {showErrors && errors.declaration && (
               <p className="mt-2 text-sm text-red-400">
                 * {errors.declaration.message}
+              </p>
+            )}
+          </div>
+
+          <hr className="border-gray-700 my-6" />
+
+          {/* TERMS AND CONDITIONS */}
+          <div className="mb-2">
+            <label className="flex items-start gap-3 cursor-pointer group">
+              <input
+                type="checkbox"
+                {...register("termsAccepted", {
+                  onChange: () => clearErrors("termsAccepted"),
+                })}
+                className="w-5 h-5 mt-0.5 accent-white bg-[#0f0f0f] cursor-pointer flex-shrink-0"
+              />
+              <span className="text-gray-300 text-sm leading-relaxed group-hover:text-white transition-colors">
+                I agree to the Terms and Conditions and acknowledge that I have read the privacy policy.
+              </span>
+            </label>
+
+            {showErrors && errors.termsAccepted && (
+              <p className="mt-2 text-sm text-red-400">
+                * {errors.termsAccepted.message}
               </p>
             )}
           </div>
@@ -141,10 +165,10 @@ const Step5Additional = ({ onNext, shake, isSubmitting }) => {
           <button
             type="button"
             onClick={onNext}
-            disabled={isSubmitting || !declaration}
+            disabled={isSubmitting || !declaration || !termsAccepted}
             className={`max-w-lg w-full py-4 rounded-full text-lg font-bold transition-colors duration-200
               ${
-                declaration && !isSubmitting
+                declaration && termsAccepted && !isSubmitting
                   ? "bg-white text-black hover:bg-gray-200"
                   : "bg-gray-700 text-gray-400 cursor-not-allowed"
               }`}
