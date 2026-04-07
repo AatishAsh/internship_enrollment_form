@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { FormProvider } from "react-hook-form";
 import useEnrollmentForm from "./form/useEnrollmentForm";
-
 import Step1BasicInfo from "./steps/Step1BasicInfo";
 import Step2AcademicDetails from "./steps/Step2AcademicDetails";
 import Step3InternshipPreferences from "./steps/Step3InternshipPreferences";
