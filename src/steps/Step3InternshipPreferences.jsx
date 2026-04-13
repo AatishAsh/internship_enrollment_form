@@ -35,21 +35,37 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
 
   const { showErrors } = useFormUI();
 
-  const selectedDomains = useWatch({ control, name: "internshipDomains" }) || [];
+  const selectedDomains =
+    useWatch({ control, name: "internshipDomains" }) || [];
   const isOtherSelected = selectedDomains.includes("Other");
 
   return (
     <div className="min-h-screen bg-[#000001] text-white overflow-x-hidden">
       <div className="max-w-md sm:max-w-lg px-4 sm:px-6 mx-auto pt-4 pb-8">
+
+        {/* ✅ TOP IMAGE (from public folder) */}
+        <div className="mb-6">
+          <img
+            src="/images/internship-levels.png"
+            alt="Internship Levels"
+            className="w-full rounded-xl shadow-[0_0_40px_rgba(139,92,246,0.25)]"
+          />
+        </div>
+
+        {/* FORM CARD */}
         <div className={`bg-[#1a1a1a] shadow-lg rounded-md p-6 ${shake ? "shake" : ""}`}>
 
-          <h2 className="text-2xl font-semibold mb-8">Internship Preferences</h2>
+          <h2 className="text-2xl font-semibold mb-8">
+            Internship Preferences
+          </h2>
 
-          {/* INTERNSHIP DOMAIN — CHECKBOXES */}
+          {/* INTERNSHIP DOMAIN */}
           <div className="mb-6">
             <label className="block mb-3 font-medium">
-              Preferred / Interested Internship Domain <span className="text-red-400">*</span>
+              Preferred / Interested Internship Domain{" "}
+              <span className="text-red-400">*</span>
             </label>
+
             <div className="space-y-3">
               {DOMAINS.map((domain) => (
                 <label
@@ -71,7 +87,7 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
               ))}
             </div>
 
-            {/* OTHER TEXT INPUT */}
+            {/* OTHER INPUT */}
             {isOtherSelected && (
               <div className="mt-4">
                 <input
@@ -98,11 +114,13 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
 
           <hr className="border-gray-700 mb-6" />
 
-          {/* INTERNSHIP TYPE — RADIO */}
+          {/* INTERNSHIP TYPE */}
           <div className="mb-6">
             <label className="block mb-3 font-medium">
-              Available Internship Type <span className="text-red-400">*</span>
+              Available Internship Type{" "}
+              <span className="text-red-400">*</span>
             </label>
+
             <div className="space-y-3">
               {INTERNSHIP_TYPES.map((type) => (
                 <label
@@ -123,6 +141,7 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
                 </label>
               ))}
             </div>
+
             {showErrors && errors.internshipType && (
               <p className="mt-2 text-sm text-red-400">
                 * {errors.internshipType.message}
@@ -132,11 +151,13 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
 
           <hr className="border-gray-700 mb-6" />
 
-          {/* PREFERRED START DATE */}
+          {/* START DATE */}
           <div className="mb-6">
             <label className="block mb-2 font-medium">
-              Preferred Start Date <span className="text-red-400">*</span>
+              Preferred Start Date{" "}
+              <span className="text-red-400">*</span>
             </label>
+
             <div className="relative">
               <input
                 type="date"
@@ -149,6 +170,7 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
                 <CalendarDays />
               </span>
             </div>
+
             {showErrors && errors.preferredStartDate && (
               <p className="mt-1 text-sm text-red-400">
                 * {errors.preferredStartDate.message}
@@ -158,11 +180,13 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
 
           <hr className="border-gray-700 mb-6" />
 
-          {/* INTERNSHIP DURATION — RADIO */}
+          {/* DURATION */}
           <div className="mb-2">
             <label className="block mb-3 font-medium">
-              Preferred Duration for Internship <span className="text-red-400">*</span>
+              Preferred Duration for Internship{" "}
+              <span className="text-red-400">*</span>
             </label>
+
             <div className="space-y-3">
               {DURATIONS.map((duration) => (
                 <label
@@ -183,13 +207,13 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
                 </label>
               ))}
             </div>
+
             {showErrors && errors.internshipDuration && (
               <p className="mt-2 text-sm text-red-400">
                 * {errors.internshipDuration.message}
               </p>
             )}
           </div>
-
         </div>
 
         {/* NEXT BUTTON */}
