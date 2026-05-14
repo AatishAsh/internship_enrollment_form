@@ -180,3 +180,20 @@ select option {
     @apply bg-background text-foreground;
   }
 }
+/* ── Copy/paste protection: disable drag text-selection everywhere ── */
+* {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Re-enable selection inside form inputs and textareas so typing still works */
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}

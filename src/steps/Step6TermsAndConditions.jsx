@@ -1,11 +1,11 @@
 import { useFormContext } from "react-hook-form";
 import { Link } from "react-router-dom";
 
-const Step6TermsAndConditions = ({ onNext, shake }) => {
+const Step6TermsAndConditions = ({ onNext, shake, isSubmitting }) => {
   const {
     register,
     watch,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useFormContext();
 
   const accepted = watch("acceptTerms");
@@ -189,7 +189,7 @@ const Step6TermsAndConditions = ({ onNext, shake }) => {
           </p>
         )}
 
-        {/* ✅ SUBMIT BUTTON */}
+        {/* SUBMIT BUTTON */}
         <div className="mt-8 flex justify-center">
           <button
             type="button"
@@ -202,10 +202,29 @@ const Step6TermsAndConditions = ({ onNext, shake }) => {
                   : "bg-gray-600 text-gray-400 cursor-not-allowed"
               }`}
           >
-            {isSubmitting ? "Submitting..." : "Submit Application"}
+            Submit Application
           </button>
         </div>
       </div>
+
+      {/* FULL-SCREEN LOADING OVERLAY — shown while submitting */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+
+          {/* Spinner */}
+          <div className="w-16 h-16 rounded-full border-4 border-gray-600 border-t-white animate-spin mb-6" />
+
+          {/* Message */}
+          <p className="text-white text-xl font-semibold mb-2">
+            Submitting your application...
+          </p>
+          <p className="text-gray-400 text-sm text-center max-w-xs px-4">
+            Please wait and do not close this page.
+            <br />
+            Uploading your documents to Server.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
