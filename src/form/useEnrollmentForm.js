@@ -1,99 +1,76 @@
+// ── useEnrollmentForm.js ───────────────────────────────────────
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
+import { useState } from "react";
 import schema from "./validationSchema";
 import { submitToGoogle } from "./submitToGoogle";
-import React from "react";
-import { useState } from "react";
 import { uploadFilesToDrive } from "./uploadToGoogleDrive";
 import { toast } from "../components/ui/use-toast";
 
 const useEnrollmentForm = (setStep) => {
-  const [showErrors, setShowErrors] = useState(false);
+  const [showErrors,   setShowErrors  ] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const methods = useForm({
-    //resolver: yupResolver(schema),
-    mode: "onSubmit", // IMPORTANT
-    reValidateMode: "onSubmit",
-    defaultValues: {
-      education: [
-        {
-          level: "",
-          field: "",
-          institution: "",
-          location: "",
-          passingYear: "",
-          grade: "",
-        },
-      ],
-      employmentType: "",
-      employment: [
-        {
-          organization: "",
-          location: "",
-          workMode: "",
-          designation: "",
-          from: "",
-          to: "",
-          ctc: "",
-          payslip: null,
-          experienceCertificate: null,
-        },
-      ],
-      declaration: false,
-    },
+    resolver       : yupResolver(schema),
+    mode           : "onSubmit",
+    reValidateMode : "onSubmit",
   });
 
+  // ── Main submit handler ──────────────────────────────────────
   const onSubmit = async (data) => {
     try {
       setIsSubmitting(true);
 
-      const folderId = methods.getValues("submissionFolderId");
-      const fullName = data.fullName;
+      const fullName = (data.fullName || "Unknown Intern").trim();
 
-      if (Array.isArray(data.employment)) {
-        for (const employment of data.employment) {
-          if (employment.payslip) {
-            const payslipUpload = await uploadFilesToDrive(
-              employment.payslip,
-              fullName,
-              folderId,
-            );
+      // ── Step A: Upload resume / portfolio file(s) to Drive ───
+      // Step 4 stores the file list under the key "resume".
+      const filesToUpload = data.resume;
 
-            employment.payslipLinks = payslipUpload?.links || [];
-          }
+      if (filesToUpload && Array.isArray(filesToUpload) && filesToUpload.length > 0) {
+        const uploadResult = await uploadFilesToDrive(
+          filesToUpload,
+          fullName,
+          null  // null → Apps Script creates a new named sub-folder
+        );
 
-          if (employment.experienceCertificate) {
-            const expUpload = await uploadFilesToDrive(
-              employment.experienceCertificate,
-              fullName,
-              folderId,
-            );
+        // Store human-readable links in the payload
+        data.documentLinks = uploadResult.links || [];
 
-            employment.experienceLinks = expUpload?.links || [];
-          }
-        }
+        // Store the folder ID so the sheet row can link back to the Drive folder
+        data.driveFolderId = uploadResult.folderId || null;
+      } else {
+        data.documentLinks = [];
+        data.driveFolderId = null;
       }
-      
-      // To check data is passed to google sheets
-      // console.log("FINAL DATA:", data);
 
+      // ── Step B: Strip raw File objects — they can't be JSON-serialised ──
+      // "resume" holds actual File objects; we've already uploaded them above.
+      delete data.resume;
+
+      // ── Step C: Submit cleaned text data + Drive links to Sheets ──
       await submitToGoogle(data);
-      // show success notification
+
+      // ── Step D: Success feedback ─────────────────────────────
       toast({
-        title: "Submission successful",
-        description: "Your information has been submitted successfully.",
-        variant: "success",
-        duration: 3000,
+        title      : "Application submitted!",
+        description: "We'll be in touch soon. Check your email for confirmation.",
+        variant    : "success",
+        duration   : 4000,
       });
 
-      // go to success page
-      setStep(6);
+      // Navigate to the SuccessCompletion screen (step 9)
+      setStep(9);
+
     } catch (err) {
-      console.error("FINAL ERROR:", err);
+      console.error("Submission error:", err);
+
       toast({
-        title: "Submission failed",
-        description: err.message || "Something went wrong.",
+        title      : "Submission failed",
+        description: err.message || "Something went wrong. Please try again.",
+        variant    : "destructive",
+        duration   : 5000,
       });
     } finally {
       setIsSubmitting(false);

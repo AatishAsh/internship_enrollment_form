@@ -15,6 +15,7 @@ import ProgressBar from "./components/navigations/ProgressBar";
 import { FormUIContext } from "./context/FormUIContext";
 import BackgroundFileUploader from "./components/fileupload/BackgroundFileUploader";
 import { Toaster } from "./components/ui/toaster";
+import { useNoCopy } from "./hooks/useNoCopy";
 
 const stepFields = {
   1: ["fullName", "gender", "email", "phone", "currentLocation"],
@@ -85,6 +86,8 @@ function App() {
   const [shakeForm, setShakeForm] = useState(false);
 
   const form = useEnrollmentForm(setStep);
+
+  useNoCopy(step);
 
   const nextStep = async () => {
     form.setShowErrors(true);
@@ -159,11 +162,11 @@ function App() {
               />
             )}
 
-            {/* ✅ Step6 → FINAL SUBMIT */}
             {step === 6 && (
               <Step6TermsAndConditions
                 onNext={nextStep}
                 shake={shakeForm}
+                isSubmitting={form.isSubmitting}
               />
             )}
 

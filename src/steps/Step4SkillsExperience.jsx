@@ -82,6 +82,16 @@ const Step4SkillsExperience = ({ onNext, shake }) => {
               })}
               placeholder="e.g. https://github.com/yourname"
               className="w-full p-3 sm:p-4 rounded-md bg-[#0f0f0f] text-white placeholder-gray-400 focus:outline-none"
+              onPaste={(e)    => e.stopPropagation()}
+              onCopy={(e)     => e.stopPropagation()}
+              onCut={(e)      => e.stopPropagation()}
+              onKeyDown={(e)  => {
+                const ctrl = e.ctrlKey || e.metaKey;
+                if (ctrl && ["c", "x", "v", "a"].includes(e.key)) {
+                  e.stopPropagation(); // let Ctrl+C/V/A work normally here
+                }
+              }}
+              onContextMenu={(e) => e.stopPropagation()}
             />
             {showErrors && errors.profileLink && (
               <p className="mt-1 text-sm text-red-400">

@@ -1,69 +1,67 @@
-export async function uploadFilesToDrive(files, userName, folderId = null) {
-  // console.log("=== Upload Starting ===");
-  // console.log("Files:", files);
+const APPS_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbxR7LC5Xi6CypBdufL-WWg2QH1z87XYlJ6ndR8LBzhHy3iVs8dc8FGhRH0NHtpnpvSb/exec";
+//  ↑ Same URL as submitToGoogle.js — keep both in sync.
 
+/**
+ * @param {FileList | File[]} files      Files chosen by the user
+ * @param {string}            userName   Used to name the Drive sub-folder
+ * @param {string|null}       folderId   Reuse an existing folder (optional)
+ * @returns {{ links: Array<{name,url,id}>, folderId: string } | []}
+ */
+export async function uploadFilesToDrive(files, userName, folderId = null) {
   const fileArray = Array.from(files);
 
   if (fileArray.length === 0) {
-    // console.error("No files!");
-    return [];
+    return { links: [], folderId: null };
   }
 
-  // Convert files to Base64
-  const filePromises = fileArray.map((file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
+  // ── 1. Convert every file to Base64 ──────────────────────────
+  const base64Files = await Promise.all(
+    fileArray.map(
+      (file) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload  = () =>
+            resolve({
+              name    : file.name,
+              mimeType: file.type || "application/octet-stream",
+              data    : reader.result.split(",")[1], // strip the data-URL prefix
+            });
+          reader.onerror = () => reject(new Error(`Failed to read file: ${file.name}`));
+          reader.readAsDataURL(file);
+        })
+    )
+  );
 
-      reader.onload = () => {
-        const base64 = reader.result.split(",")[1]; // Remove data:image/png;base64, prefix
-        resolve({
-          name: file.name,
-          mimeType: file.type,
-          data: base64,
-        });
-      };
-
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+  // ── 2. POST to Apps Script ────────────────────────────────────
+  const response = await fetch(APPS_SCRIPT_URL, {
+    method : "POST",
+    headers: { "Content-Type": "text/plain" },
+    body   : JSON.stringify({
+      action  : "uploadFiles",   // tells Apps Script which handler to use
+      userName: userName || "Unknown",
+      files   : base64Files,
+      folderId: folderId,         // null → script creates a new sub-folder
+    }),
   });
 
-  const base64Files = await Promise.all(filePromises);
-  // console.log("Files converted to Base64");
+  const text = await response.text();
 
+  let result;
   try {
-     const url = "https://script.google.com/macros/s/AKfycbytL3Pbossrp1eK2HEawv4FBpmZi0RsFr7mj9Zk9JVi_0snEbbBtPHr2DeNa-MYCMCt_g/exec";
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain",
-      },
-      body: JSON.stringify({
-        action: "uploadFiles",
-        userName: userName,
-        files: base64Files,
-        folderId: folderId,
-      }),
-    });
-
-    const text = await response.text();
-    // console.log("Response:", text);
-
-    const result = JSON.parse(text);
-
-    if (result.success && result.links) {
-      // console.log("✅ Upload successful! Links:", result.links);
-      return {
-        links: result.links,
-        folderId: result.folderId,
-      };
-    } else {
-      // console.error("❌ Upload failed:", result);
-      return [];
-    }
-  } catch (error) {
-    console.error("❌ Upload error:", error);
-    return [];
+    result = JSON.parse(text);
+  } catch {
+    throw new Error("Apps Script returned invalid JSON during file upload.");
   }
+
+  if (!result.success) {
+    throw new Error(result.error || "File upload failed.");
+  }
+
+  // ── 3. Return links + folderId ────────────────────────────────
+  return {
+    links   : result.links    || [],    // [{ name, url, id }, …]
+    folderId: result.folderId || null,  // Drive folder ID for this intern
+    folderUrl: result.folderUrl || null,
+  };
 }
