@@ -42,6 +42,7 @@ const stepFields = {
         ...base,
         "collegeRegNumber",
         "courseName",
+        "yearOfStudy",
         "collegeName",
         "collegeAddress",
         "collegeGraduationYear",
@@ -111,8 +112,8 @@ function App() {
 
     // ✅ FINAL SUBMIT happens at Step 6
     if (step === 6) {
-      await form.onSubmit(form.getValues());
-      setStep(7);
+      const success = await form.onSubmit(form.getValues());
+      if (success) setStep(7);
     } else {
       setStep((prev) => prev + 1);
     }

@@ -177,6 +177,32 @@ const Step2AcademicDetails = ({ onNext, shake }) => {
                 )}
               </div>
 
+              <div className="mb-4 relative">
+                <label className="block mb-2 font-medium">
+                  Year of Study <span className="text-red-400">*</span>
+                </label>
+                <select
+                  {...register("yearOfStudy", {
+                    onChange: () => clearErrors("yearOfStudy"),
+                  })}
+                  className="w-full p-3 sm:p-4 rounded-md bg-[#0f0f0f] text-gray-200 appearance-none cursor-pointer focus:outline-none"
+                >
+                  <option value="">Select Year</option>
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
+                  <option value="5th Year">5th Year</option>
+                  <option value="Completed">Completed / Alumni</option>
+                </select>
+                <span className="absolute right-4 top-12 text-gray-400 pointer-events-none">
+                  <ChevronDown />
+                </span>
+                {showErrors && errors.yearOfStudy && (
+                  <p className="mt-1 text-sm text-red-400">* {errors.yearOfStudy.message}</p>
+                )}
+              </div>
+
               <div className="mb-4">
                 <label className="block mb-2 font-medium">
                   Institution / College Name <span className="text-red-400">*</span>

@@ -60,8 +60,7 @@ const useEnrollmentForm = (setStep) => {
         duration   : 4000,
       });
 
-      // Navigate to the SuccessCompletion screen (step 9)
-      setStep(9);
+      return true;
 
     } catch (err) {
       console.error("Submission error:", err);
@@ -72,6 +71,8 @@ const useEnrollmentForm = (setStep) => {
         variant    : "destructive",
         duration   : 5000,
       });
+
+      return false;
     } finally {
       setIsSubmitting(false);
     }

@@ -41,7 +41,7 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
 
   return (
     <div className="min-h-screen bg-[#000001] text-white overflow-x-hidden">
-      <div className="max-w-md sm:max-w-lg px-4 sm:px-6 mx-auto pt-4 pb-8">
+      <div className="max-w-md sm:max-w-3xl px-4 sm:px-6 mx-auto pt-4 pb-8">
 
         {/* ✅ TOP IMAGE (from public folder) */}
         <div className="mb-6">
@@ -217,7 +217,7 @@ const Step3InternshipPreferences = ({ onNext, shake }) => {
         </div>
 
         {/* NEXT BUTTON */}
-        <div className="mt-5 mb-8">
+        <div className="mt-5 mb-8 flex justify-center">
           <button
             type="button"
             onClick={onNext}

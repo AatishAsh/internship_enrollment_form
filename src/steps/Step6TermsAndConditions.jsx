@@ -164,30 +164,34 @@ const Step6TermsAndConditions = ({ onNext, shake, isSubmitting }) => {
             </ul>
           </section>
 
+          <hr className="border-gray-700" />
+
+          {/* ✅ CHECKBOX INSIDE SCROLLABLE AREA */}
+          <div className="pt-4">
+            <div className="flex items-center gap-3 p-4 bg-black/20 rounded-lg border border-gray-800">
+              <input
+                type="checkbox"
+                id="terms"
+                {...register("acceptTerms", {
+                  required: "You must accept terms",
+                })}
+                className="w-5 h-5 cursor-pointer accent-white"
+              />
+
+              <label htmlFor="terms" className="text-gray-200 font-medium cursor-pointer">
+                I have read and agree to all the Terms and Conditions
+              </label>
+            </div>
+
+            {/* ERROR */}
+            {errors.acceptTerms && (
+              <p className="text-red-400 mt-2 text-sm font-medium">
+                {errors.acceptTerms.message}
+              </p>
+            )}
+          </div>
+
         </div>
-
-        {/* ✅ CHECKBOX */}
-        <div className="mt-6 flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="terms"
-            {...register("acceptTerms", {
-              required: "You must accept terms",
-            })}
-            className="w-4 h-4"
-          />
-
-          <label htmlFor="terms" className="text-gray-300">
-            I agree to the Terms and Conditions
-          </label>
-        </div>
-
-        {/* ERROR */}
-        {errors.acceptTerms && (
-          <p className="text-red-400 mt-2 text-sm">
-            {errors.acceptTerms.message}
-          </p>
-        )}
 
         {/* SUBMIT BUTTON */}
         <div className="mt-8 flex justify-center">

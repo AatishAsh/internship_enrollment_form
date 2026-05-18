@@ -106,6 +106,14 @@ export default yup.object({
       otherwise: (schema) => schema.nullable().optional(),
     }),
 
+  yearOfStudy: yup
+    .string()
+    .when("educationStatus", {
+      is: (val) => val === "College Student" || val === "Recent Graduate",
+      then: (schema) => schema.required("Year of study is required"),
+      otherwise: (schema) => schema.nullable().optional(),
+    }),
+
   collegeName: yup
     .string()
     .when("educationStatus", {
