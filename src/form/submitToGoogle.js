@@ -1,5 +1,5 @@
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbxR7LC5Xi6CypBdufL-WWg2QH1z87XYlJ6ndR8LBzhHy3iVs8dc8FGhRH0NHtpnpvSb/exec";
+  "https://script.google.com/macros/s/AKfycbyDeLQ1V3GdIwXYV0o_03h_9YuppTB4-dvqFYyiLEIjSfNVGbcXGF5sK9NnnLK7vf-h-A/exec";
 
 export async function submitToGoogle(data) {
   const response = await fetch(APPS_SCRIPT_URL, {
