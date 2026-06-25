@@ -1,5 +1,5 @@
 const APPS_SCRIPT_URL =
-  "https://script.google.com/macros/s/AKfycbyrVPBiTcLDf-7t5ykMeXtRLT8ueWuKPkj4puZ2JJ6tqzmdzS0rn_yLnwqWe815mJUEzg/exec";
+  "https://script.google.com/macros/s/AKfycbzNaz-mNf8t74aln6LTQr6rscpEH7cjkj_y13nojHXzTsiB0F0NULHxolK-tZTda9F_DA/exec";
 //  ↑ Same URL as submitToGoogle.js — keep both in sync.
 
 /**

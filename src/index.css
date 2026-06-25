@@ -197,3 +197,58 @@ textarea,
   -ms-user-select: text;
   user-select: text;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Custom white checkboxes and radio buttons (mobile visibility fix)
+   ───────────────────────────────────────────────────────────── */
+input[type="checkbox"].accent-white,
+input[type="radio"].accent-white {
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #0f0f0f;
+  border: 1px solid #4b5563; /* border-gray-600 equivalent */
+  display: inline-block;
+  vertical-align: middle;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="checkbox"].accent-white {
+  border-radius: 0.25rem; /* rounded equivalent */
+}
+
+input[type="radio"].accent-white {
+  border-radius: 9999px; /* rounded-full equivalent */
+}
+
+/* Checked States */
+input[type="checkbox"].accent-white:checked {
+  background-color: #ffffff;
+  border-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000000' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-size: 70% 70%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+input[type="radio"].accent-white:checked {
+  background-color: #ffffff;
+  border-color: #ffffff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000000'%3E%3Ccircle cx='12' cy='12' r='5'/%3E%3C/svg%3E");
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Focus and Hover states */
+input[type="checkbox"].accent-white:hover,
+input[type="radio"].accent-white:hover {
+  border-color: #9ca3af; /* border-gray-400 equivalent */
+}
+
+input[type="checkbox"].accent-white:focus-visible,
+input[type="radio"].accent-white:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.6);
+  outline-offset: 2px;
+}
