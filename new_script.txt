@@ -1,0 +1,711 @@
+// ============================================================
+// SHINE CRAFT TECHNOLOGY
+// File: EnrollmentCombined.gs  v4 (FIXED)
+//
+// ✅ THIS SINGLE SCRIPT GOES IN YOUR RESPONSE SHEET:
+//     https://docs.google.com/spreadsheets/d/1eX3Ugzc-VxRAc-7lW-dDRrTKDbLnmfU-2zP71zBWS94
+//
+// WHAT THIS DOES:
+//   1. Receives form data from your website → saves to Enrollment tab
+//   2. Handles file uploads → saves to Google Drive
+//   3. When a new row is submitted → notifies WhatsApp automation
+//   4. When HR edits a dropdown → syncs change to WhatsApp automation
+//   5. Mirrors every new Google Form response row from
+//      "internship automation" tab in THIS sheet
+//      → into "Internship whatsapp automation" tab of the WhatsApp sheet
+//
+// v4 CHANGE LOG:
+//   - FIXED: MIRROR_SOURCE_TAB was "Internship Application Form (Responses)"
+//     which does NOT exist. Corrected to "internship automation" — the
+//     actual tab name confirmed by the user. This was the reason nothing
+//     was mirroring: getSheetByName() returned null and the function
+//     returned silently every time.
+//   - ADDED: testDriveAccess() in Section 7 — run this manually to confirm
+//     DriveApp can access MASTER_FOLDER_ID before debugging anything else.
+//     This isolates the "Access denied: DriveApp" error from file-upload
+//     logic, since calling handleFileUpload() directly with no payload
+//     will always throw on the destructure line instead of testing Drive.
+//
+// STEPS AFTER PASTING:
+//   Step 1: Confirm all config values below are correct
+//   Step 2: Run setupEnrollmentTrigger() ONCE
+//   Step 3: Run testConnectionToAutomation() to confirm URL works
+//   Step 4: Run mirrorAllExistingRows() ONCE to copy old responses
+//   Step 5: Run testDriveAccess() to confirm Drive permissions work
+// ============================================================
+
+
+// ─────────────────────────────────────────────────────────────
+// ██  CONFIG ██
+// ─────────────────────────────────────────────────────────────
+
+// This is the spreadsheet where THIS script is installed.
+// Try to get the active spreadsheet ID dynamically, falling back to the hardcoded ID if standalone.
+var SHEET_ID;
+try {
+  SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+} catch (e) {
+  SHEET_ID = "1A-7mAqIXlwZWcSiPpztKtspwnSnO52sQpebMYWSSMXI";
+}
+
+const MASTER_FOLDER_ID = "1FbOzpi4qFf3hLy2slNuSORuzYu-M0PLc";
+
+// The tab in THIS sheet where website form submissions are saved
+const SHEET_NAME       = "Enrollment";
+
+// Web App URL from your WhatsApp automation sheet
+var AUTOMATION_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycby6Gj-PEhnWm62R73PLPoGeDUY0t8aMO8wH_7LvQwaXRbHmOFhlyVoG_plVFHFZzc7R/exec';
+
+// ─────────────────────────────────────────────────────────────
+// ██  MIRRORING CONFIG ██
+// Source tab: where Google Form drops responses in THIS sheet
+// Target: the other spreadsheet + tab to mirror into
+// ─────────────────────────────────────────────────────────────
+
+// ✅ FIXED — this is the EXACT tab name confirmed by the user where
+//    the Google Form actually writes its responses inside SHEET_ID.
+var MIRROR_SOURCE_TAB   = 'internship automation';
+
+// The spreadsheet ID of your WhatsApp automation sheet
+// (copied from its URL: docs.google.com/spreadsheets/d/THIS_PART/edit)
+var MIRROR_TARGET_SS_ID = '1HsRXH-3r_ZGKJ9ghWbChnkXXWRVGYXxsh9eIJifxf1o';
+
+// The EXACT tab name inside that sheet where mirrored data goes
+var MIRROR_TARGET_TAB   = 'internship whatsapp automation';
+
+// ─────────────────────────────────────────────────────────────
+// ██  COLUMN ORDER — website form submissions ██
+// ─────────────────────────────────────────────────────────────
+
+const COLUMN_ORDER = [
+  "submittedAt",
+  "fullName", "gender", "email", "phone", "currentLocation",
+  "educationStatus",
+  "schoolRegNumber", "schoolGroup", "schoolName", "schoolAddress", "schoolGraduationYear",
+  "collegeRegNumber", "courseName", "collegeName", "collegeAddress", "collegeGraduationYear",
+  "internshipDomains", "internshipDomainOther", "internshipType",
+  "preferredStartDate", "internshipDuration",
+  "technicalSkills", "projectDetails", "profileLink", "resumeLinks",
+  "hearAboutUs", "hearAboutUsOther", "expectations", "declaration",
+  "acceptTerms",
+  "driveFolderLink",
+  "yearOfStudy", // Added safely at the end to prevent shifting existing column indices
+];
+
+// ─────────────────────────────────────────────────────────────
+// ██  HR COLUMNS — columns HR edits in Enrollment tab ██
+// Column A=1, B=2 ... AA=27, AB=28 etc.
+// ─────────────────────────────────────────────────────────────
+
+var SYNC_BACK_COLUMNS = {
+  27: 'Enrolled Status',
+  28: 'Level 1 Schedule',
+  29: 'Interview level 1 Status',
+  30: 'Technical comments',
+  31: 'Level 2 Schedule',
+  32: 'Interview level 2 Status',
+  33: 'Non Technical comments',
+  34: 'Note',
+  35: 'Task detail',
+  36: 'Deadline',
+  37: 'Task staus',
+  38: 'Satuts',
+  39: 'Desgination',
+};
+
+var WA_TRIGGER_COLUMNS  = [27, 29, 32, 37, 38];
+var ENROLLMENT_TAB_NAME = 'Enrollment';
+
+
+// ============================================================
+//  ██  SECTION 1 — WEB APP ENTRY POINTS  ██
+// ============================================================
+
+function doPost(e) {
+  const output = ContentService.createTextOutput();
+  output.setMimeType(ContentService.MimeType.JSON);
+
+  try {
+    const payload = JSON.parse(e.postData.contents);
+
+    if (payload.action === "uploadFiles") {
+      output.setContent(JSON.stringify(handleFileUpload(payload)));
+
+    } else if (payload.action === "NEW_FORM_SUBMIT") {
+      output.setContent(JSON.stringify(handleNewFormSubmitFromAutomation(payload)));
+
+    } else if (payload.action === "SYNC_BACK") {
+      output.setContent(JSON.stringify(handleSyncBackFromAutomation(payload)));
+
+    } else if (payload.action === "SYNC_BACK_TO_SOURCE") {
+      output.setContent(JSON.stringify(handleSyncBackToSource(payload)));
+
+    } else {
+      output.setContent(JSON.stringify(handleFormSubmission(payload)));
+    }
+
+  } catch (err) {
+    output.setContent(JSON.stringify({ success: false, error: err.message }));
+  }
+
+  return output;
+}
+
+function doGet(e) {
+  return ContentService
+    .createTextOutput(JSON.stringify({ status: "ok" }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+// ============================================================
+//  ██  SECTION 2 — FILE UPLOAD HANDLER  ██
+// ============================================================
+
+function handleFileUpload(payload) {
+  const { userName, files, folderId } = payload;
+
+  if (!files || files.length === 0) {
+    return { success: false, error: "No files provided" };
+  }
+
+  const masterFolder = DriveApp.getFolderById(MASTER_FOLDER_ID);
+
+  let internFolder;
+  if (folderId) {
+    try { internFolder = DriveApp.getFolderById(folderId); }
+    catch (_) { internFolder = null; }
+  }
+
+  if (!internFolder) {
+    const safeName  = (userName || "Unknown").replace(/[^a-zA-Z0-9 _-]/g, "").trim();
+    const timestamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd_HHmmss");
+    internFolder    = masterFolder.createFolder(safeName + "_" + timestamp);
+  }
+
+  const links = [];
+  for (const file of files) {
+    const decoded  = Utilities.base64Decode(file.data);
+    const blob     = Utilities.newBlob(decoded, file.mimeType, file.name);
+    const uploaded = internFolder.createFile(blob);
+    try {
+      uploaded.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (sharingErr) {
+      Logger.log('[Upload] Could not set public sharing: ' + sharingErr.message);
+    }
+    links.push({ name: file.name, url: uploaded.getUrl(), id: uploaded.getId() });
+  }
+
+  return {
+    success  : true,
+    links    : links,
+    folderId : internFolder.getId(),
+    folderUrl: internFolder.getUrl(),
+  };
+}
+
+
+// ============================================================
+//  ██  SECTION 3 — WEBSITE FORM SUBMISSION HANDLER  ██
+// ============================================================
+
+function handleFormSubmission(data) {
+  const ss  = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_NAME);
+
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_NAME);
+    sheet.appendRow(COLUMN_ORDER);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, COLUMN_ORDER.length).setFontWeight("bold");
+  }
+
+  const firstRow = sheet.getRange(1, 1, 1, COLUMN_ORDER.length).getValues()[0];
+  if (firstRow[0] !== COLUMN_ORDER[0]) {
+    sheet.insertRowBefore(1);
+    sheet.getRange(1, 1, 1, COLUMN_ORDER.length).setValues([COLUMN_ORDER]);
+    sheet.setFrozenRows(1);
+    sheet.getRange(1, 1, 1, COLUMN_ORDER.length).setFontWeight("bold");
+  }
+
+  data.submittedAt = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+
+  if (Array.isArray(data.internshipDomains)) {
+    data.internshipDomains = data.internshipDomains.join(", ");
+  }
+  if (Array.isArray(data.documentLinks)) {
+    data.resumeLinks = data.documentLinks.map(l => (l.url || l)).join("\n");
+  }
+  if (data.driveFolderId) {
+    data.driveFolderLink = "https://drive.google.com/drive/folders/" + data.driveFolderId;
+  }
+
+  const row = COLUMN_ORDER.map(key => {
+    const val = data[key];
+    if (val === undefined || val === null) return "";
+    if (typeof val === "boolean") return val ? "Yes" : "No";
+    return String(val);
+  });
+
+  sheet.appendRow(row);
+  _notifyAutomationNewSubmit(sheet.getLastRow(), SHEET_ID);
+
+  return { success: true };
+}
+
+
+// ============================================================
+//  ██  SECTION 4 — TRIGGER HANDLERS  ██
+// ============================================================
+
+// Fires when Google Form submits a new response into MIRROR_SOURCE_TAB
+// The event object 'e' contains the full row data — we use that directly
+// instead of trying to re-read the sheet by row index (safer, no race condition)
+function onEnrollmentFormSubmit(e) {
+  try {
+    Logger.log('[Enrollment] Google Form submit trigger fired.');
+
+    // Get the row index that was just written
+    var range    = e && e.range ? e.range : null;
+    var rowIndex = range ? range.getRow() : null;
+
+    // 1. Mirror this new row to the WhatsApp automation sheet.
+    //    The mirror function itself notifies the WhatsApp automation
+    //    web app with the TARGET row index once the row is written —
+    //    that's the row number the WhatsApp script needs to read from,
+    //    not the source row index.
+    mirrorRowToWhatsAppSheet(rowIndex, e);
+
+  } catch (err) {
+    Logger.log('[Enrollment] onEnrollmentFormSubmit error: ' + err.message);
+  }
+}
+
+// Fires when HR edits any cell in the Enrollment tab
+function onEnrollmentEdit(e) {
+  try {
+    var sheet = e.source.getActiveSheet();
+    if (sheet.getName() !== ENROLLMENT_TAB_NAME) return;
+
+    var row = e.range.getRow();
+    var col = e.range.getColumn();
+
+    if (row < 2) return;
+    if (!SYNC_BACK_COLUMNS[col]) return;
+
+    var newValue     = e.range.getValue();
+    var columnHeader = SYNC_BACK_COLUMNS[col];
+    var timestamp    = sheet.getRange(row, 1).getValue();
+
+    if (!timestamp) {
+      Logger.log('[Enrollment] No timestamp in row ' + row + ', skipping sync.');
+      return;
+    }
+
+    Logger.log('[Enrollment] HR edit: row=' + row + ' col=' + col +
+               ' header="' + columnHeader + '" value="' + newValue + '"');
+
+    if (!_isUrlConfigured()) {
+      Logger.log('[Enrollment] AUTOMATION_WEB_APP_URL not set.');
+      return;
+    }
+
+    var payload = JSON.stringify({
+      action       : 'SYNC_BACK',
+      timestamp    : timestamp.toString(),
+      columnHeader : columnHeader,
+      newValue     : newValue,
+      colIndex     : col,
+    });
+
+    var response = UrlFetchApp.fetch(AUTOMATION_WEB_APP_URL, {
+      method             : 'post',
+      contentType        : 'application/json',
+      payload            : payload,
+      muteHttpExceptions : true,
+    });
+
+    Logger.log('[Enrollment] Sync back HTTP ' + response.getResponseCode());
+
+  } catch (err) {
+    Logger.log('[Enrollment] onEnrollmentEdit error: ' + err.message);
+  }
+}
+
+
+// ============================================================
+//  ██  SECTION 5 — MIRRORING FEATURE  ██
+//
+//  SOURCE: THIS sheet (SHEET_ID = 1eX3Ugzc...)
+//          tab: "internship automation"
+//
+//  TARGET: WhatsApp sheet (MIRROR_TARGET_SS_ID = 1HsRXH-3r...)
+//          tab: "Internship whatsapp automation"
+//
+//  HOW IT WORKS:
+//  - Called automatically inside onEnrollmentFormSubmit()
+//    every time the Google Form gets a new submission
+//  - Reads the new row from the SOURCE tab by row index
+//  - Writes it as a new row in the TARGET tab
+//  - On first run: writes header row automatically to target
+//  - mirrorAllExistingRows() can backfill all old responses
+// ============================================================
+
+function mirrorRowToWhatsAppSheet(sourceRowIndex, e) {
+  try {
+    // ── Open SOURCE: THIS spreadsheet, form responses tab ──
+    var sourceSS    = SpreadsheetApp.openById(SHEET_ID);
+    var sourceSheet = sourceSS.getSheetByName(MIRROR_SOURCE_TAB);
+
+    if (!sourceSheet) {
+      Logger.log('[Mirror] Source tab not found: "' + MIRROR_SOURCE_TAB + '"');
+      Logger.log('[Mirror] Available tabs: ' + sourceSS.getSheets().map(function(s){ return s.getName(); }).join(', '));
+      return;
+    }
+
+    var lastCol = sourceSheet.getLastColumn();
+
+    // Read the data row — use rowIndex if we have it, otherwise use last row
+    var rowToRead = sourceRowIndex ? sourceRowIndex : sourceSheet.getLastRow();
+    var dataRow   = sourceSheet.getRange(rowToRead, 1, 1, lastCol).getValues()[0];
+
+    Logger.log('[Mirror] Reading source row ' + rowToRead + ' with ' + lastCol + ' columns.');
+
+    // ── Open TARGET: WhatsApp automation spreadsheet ──
+    var targetSS    = SpreadsheetApp.openById(MIRROR_TARGET_SS_ID);
+    var targetSheet = targetSS.getSheetByName(MIRROR_TARGET_TAB);
+
+    if (!targetSheet) {
+      // Tab doesn't exist yet — create it
+      targetSheet = targetSS.insertSheet(MIRROR_TARGET_TAB);
+      Logger.log('[Mirror] Created target tab: "' + MIRROR_TARGET_TAB + '"');
+    }
+
+    // Append the new data row (headers already exist in target sheet — not written here)
+    targetSheet.appendRow(dataRow);
+    var targetRowIndex = targetSheet.getLastRow();
+
+    Logger.log('[Mirror] Row ' + rowToRead + ' mirrored to "' + MIRROR_TARGET_TAB + '" successfully (target row ' + targetRowIndex + ').');
+
+    // ── NEW: tell the WhatsApp automation script that a fresh row just
+    //    landed at targetRowIndex, so it fetches that row's data and
+    //    sends the "Thank you for applying" message to that candidate.
+    _notifyAutomationNewSubmit(targetRowIndex, MIRROR_TARGET_SS_ID);
+
+  } catch (err) {
+    Logger.log('[Mirror] Error mirroring row: ' + err.message);
+  }
+}
+
+
+// Run this ONCE to copy all existing past responses to the target sheet
+function mirrorAllExistingRows() {
+  try {
+    var sourceSS    = SpreadsheetApp.openById(SHEET_ID);
+    var sourceSheet = sourceSS.getSheetByName(MIRROR_SOURCE_TAB);
+
+    if (!sourceSheet) {
+      var tabList = sourceSS.getSheets().map(function(s){ return s.getName(); }).join(', ');
+      Logger.log('[Mirror] Source tab "' + MIRROR_SOURCE_TAB + '" not found.');
+      Logger.log('[Mirror] Tabs in this sheet: ' + tabList);
+      try {
+        SpreadsheetApp.getUi().alert(
+          'Tab not found: "' + MIRROR_SOURCE_TAB + '"\n\n' +
+          'Tabs in this sheet:\n' + tabList + '\n\n' +
+          'Update MIRROR_SOURCE_TAB in the config to match exactly.'
+        );
+      } catch(u) {}
+      return;
+    }
+
+    var lastRow = sourceSheet.getLastRow();
+    var lastCol = sourceSheet.getLastColumn();
+
+    if (lastRow < 2) {
+      Logger.log('[Mirror] No data rows found in source tab.');
+      return;
+    }
+
+    // Read only the data rows (skip header row at index 1)
+    var allData = sourceSheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
+    var targetSS    = SpreadsheetApp.openById(MIRROR_TARGET_SS_ID);
+    var targetSheet = targetSS.getSheetByName(MIRROR_TARGET_TAB);
+
+    if (!targetSheet) {
+      targetSheet = targetSS.insertSheet(MIRROR_TARGET_TAB);
+      Logger.log('[Mirror] Created target tab: "' + MIRROR_TARGET_TAB + '"');
+    }
+
+    // Append data rows only — headers already exist in target sheet
+    for (var i = 0; i < allData.length; i++) {
+      targetSheet.appendRow(allData[i]);
+    }
+
+    var mirrored = allData.length;
+    Logger.log('[Mirror] Backfill complete. Mirrored ' + mirrored + ' rows.');
+
+    try {
+      SpreadsheetApp.getUi().alert(
+        'Backfill complete!\n\n' +
+        'Mirrored ' + mirrored + ' rows from:\n' +
+        '"' + MIRROR_SOURCE_TAB + '"\n\n' +
+        'Into:\n' +
+        '"' + MIRROR_TARGET_TAB + '" in the WhatsApp automation sheet.'
+      );
+    } catch (uiErr) {
+      Logger.log('[Mirror] (No UI context for alert.)');
+    }
+
+  } catch (err) {
+    Logger.log('[Mirror] Backfill error: ' + err.message);
+    try { SpreadsheetApp.getUi().alert('Backfill failed: ' + err.message); } catch(u) {}
+  }
+}
+
+
+// ============================================================
+//  ██  SECTION 6 — AUTOMATION CALLBACK HANDLERS  ██
+// ============================================================
+
+function handleNewFormSubmitFromAutomation(payload) {
+  Logger.log('[Enrollment] Received NEW_FORM_SUBMIT callback. Row: ' + payload.rowIndex);
+  return { success: true, message: "Received new form submit callback" };
+}
+
+function handleSyncBackFromAutomation(payload) {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return { success: false, error: "Sheet not found" };
+
+    var targetTimestamp = payload.timestamp;
+    var columnHeader    = payload.columnHeader;
+    var newValue        = payload.newValue;
+
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var colIdx  = headers.indexOf(columnHeader);
+    if (colIdx === -1) return { success: false, error: "Column not found: " + columnHeader };
+
+    var data      = sheet.getDataRange().getValues();
+    var targetRow = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === targetTimestamp) {
+        targetRow = i + 1;
+        break;
+      }
+    }
+
+    if (targetRow === -1) return { success: false, error: "Row not found for timestamp: " + targetTimestamp };
+
+    sheet.getRange(targetRow, colIdx + 1).setValue(newValue);
+    Logger.log('[Enrollment] SYNC_BACK: row ' + targetRow + ' col "' + columnHeader + '" updated.');
+
+    return { success: true };
+
+  } catch (err) {
+    Logger.log('[Enrollment] handleSyncBackFromAutomation error: ' + err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+// Called when HR edits a cell directly in the WhatsApp automation sheet.
+// Finds the matching row in the SOURCE Google Form tab (by Timestamp)
+// and writes the same value there, so both sheets stay identical.
+// If the column doesn't exist yet in the source tab, it is created
+// automatically (appended as a new column) so future syncs work too.
+function handleSyncBackToSource(payload) {
+  try {
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = ss.getSheetByName(MIRROR_SOURCE_TAB);
+    if (!sheet) return { success: false, error: "Source tab not found: " + MIRROR_SOURCE_TAB };
+
+    var targetTimestamp = (payload.timestamp || '').toString();
+    var columnHeader    = payload.columnHeader;
+    var newValue        = payload.newValue;
+
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+
+    // Timestamp is assumed to be column A in the source tab
+    var data      = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
+    var targetRow = -1;
+    for (var i = 1; i < data.length; i++) {
+      var cell = data[i][0];
+      var cellStr = (cell instanceof Date)
+        ? Utilities.formatDate(cell, Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss")
+        : (cell || '').toString();
+      if (cellStr === targetTimestamp || (cell && cell.toString() === targetTimestamp)) {
+        targetRow = i + 1;
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      Logger.log('[Mirror] SYNC_BACK_TO_SOURCE: no row matched timestamp "' + targetTimestamp + '" in "' + MIRROR_SOURCE_TAB + '"');
+      return { success: false, error: "Row not found for timestamp: " + targetTimestamp };
+    }
+
+    var colIdx = headers.indexOf(columnHeader);
+    if (colIdx === -1) {
+      // Column doesn't exist yet in the source tab — create it
+      colIdx = lastCol; // 0-based index for the new last column
+      sheet.getRange(1, lastCol + 1).setValue(columnHeader);
+      Logger.log('[Mirror] SYNC_BACK_TO_SOURCE: created new column "' + columnHeader + '" in source tab.');
+    }
+
+    sheet.getRange(targetRow, colIdx + 1).setValue(newValue);
+    Logger.log('[Mirror] SYNC_BACK_TO_SOURCE: row ' + targetRow + ' col "' + columnHeader + '" updated to "' + newValue + '"');
+
+    return { success: true };
+
+  } catch (err) {
+    Logger.log('[Mirror] handleSyncBackToSource error: ' + err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+
+
+// ============================================================
+//  ██  SECTION 7 — SETUP & TEST UTILITIES  ██
+// ============================================================
+
+function setupEnrollmentTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    var fn = t.getHandlerFunction();
+    if (fn === 'onEnrollmentFormSubmit' || fn === 'onEnrollmentEdit') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  ScriptApp.newTrigger('onEnrollmentFormSubmit')
+    .forSpreadsheet(ss)
+    .onFormSubmit()
+    .create();
+
+  ScriptApp.newTrigger('onEnrollmentEdit')
+    .forSpreadsheet(ss)
+    .onEdit()
+    .create();
+
+  Logger.log('[Enrollment] Both triggers installed.');
+
+  try {
+    SpreadsheetApp.getUi().alert(
+      'Triggers installed!\n\n' +
+      '• Form submit → notifies WhatsApp + mirrors row to automation sheet\n' +
+      '• Edit trigger → syncs HR dropdown changes\n\n' +
+      'Next steps:\n' +
+      '1. Run testConnectionToAutomation()\n' +
+      '2. Run mirrorAllExistingRows() to backfill old responses'
+    );
+  } catch (uiErr) {
+    Logger.log('[Enrollment] (No UI context — triggers installed fine.)');
+  }
+}
+
+// ▶ Verifies tab names are correct before you go live
+function debugTabNames() {
+  var ss    = SpreadsheetApp.openById(SHEET_ID);
+  var tabs  = ss.getSheets().map(function(s){ return '"' + s.getName() + '"'; }).join('\n');
+  Logger.log('[Debug] Tabs in this sheet:\n' + tabs);
+
+  try {
+    SpreadsheetApp.getUi().alert('Tabs in this sheet:\n\n' + tabs);
+  } catch(u) {}
+}
+
+function testConnectionToAutomation() {
+  if (!_isUrlConfigured()) {
+    try {
+      SpreadsheetApp.getUi().alert('AUTOMATION_WEB_APP_URL is not set!\n\nPaste your Web App URL at the top of this script.');
+    } catch (uiErr) {
+      Logger.log('[Enrollment] AUTOMATION_WEB_APP_URL is not set!');
+    }
+    return;
+  }
+
+  try {
+    var res  = UrlFetchApp.fetch(AUTOMATION_WEB_APP_URL + '?action=getPending', { muteHttpExceptions: true });
+    var code = res.getResponseCode();
+    var body = res.getContentText();
+
+    if (code === 200) {
+      Logger.log('[Enrollment] Connection successful: ' + body.substring(0, 200));
+      try {
+        SpreadsheetApp.getUi().alert('Connection successful!\n\nResponse: ' + body.substring(0, 200));
+      } catch (u) {}
+    } else {
+      Logger.log('[Enrollment] Connection failed. HTTP ' + code);
+      try {
+        SpreadsheetApp.getUi().alert(
+          'Connection failed.\n\nHTTP: ' + code + '\n' + body.substring(0, 300) +
+          '\n\nMake sure Web App is deployed:\n  Execute as: Me\n  Who has access: Anyone'
+        );
+      } catch (u) {}
+    }
+  } catch (err) {
+    Logger.log('[Enrollment] Error: ' + err.message);
+    try { SpreadsheetApp.getUi().alert('Error: ' + err.message); } catch(u) {}
+  }
+}
+
+// ▶ NEW — Run this manually to isolate the "Access denied: DriveApp" error.
+//   This does NOT touch handleFileUpload(), so it can never throw the
+//   "Cannot destructure property 'userName'" error that comes from
+//   calling handleFileUpload() with no payload. It only tests whether
+//   THIS Apps Script project's authorized identity can read
+//   MASTER_FOLDER_ID via DriveApp.
+//
+//   Run it from the function dropdown in the editor (select
+//   testDriveAccess, then click Run). Check View → Logs (or the
+//   Execution log panel) afterward for the result.
+function testDriveAccess() {
+  try {
+    var folder = DriveApp.getFolderById(MASTER_FOLDER_ID);
+    Logger.log('[DriveTest] SUCCESS — Folder name: ' + folder.getName());
+    Logger.log('[DriveTest] Folder URL: ' + folder.getUrl());
+    Logger.log('[DriveTest] Folder owner: ' + (folder.getOwner() ? folder.getOwner().getEmail() : 'unknown'));
+  } catch (err) {
+    Logger.log('[DriveTest] FAILED — ' + err.message);
+  }
+}
+
+
+// ============================================================
+//  ██  SECTION 8 — INTERNAL HELPERS  ██
+// ============================================================
+
+function _notifyAutomationNewSubmit(rowIndex, spreadsheetId) {
+  if (!_isUrlConfigured()) {
+    Logger.log('[Enrollment] AUTOMATION_WEB_APP_URL not set — skipping WhatsApp notification.');
+    return;
+  }
+
+  var payload = JSON.stringify({
+    action        : 'NEW_FORM_SUBMIT',
+    rowIndex      : rowIndex,
+    enrollmentSSId: spreadsheetId || SHEET_ID,
+  });
+
+  try {
+    var response = UrlFetchApp.fetch(AUTOMATION_WEB_APP_URL, {
+      method             : 'post',
+      contentType        : 'application/json',
+      payload            : payload,
+      muteHttpExceptions : true,
+    });
+    Logger.log('[Enrollment] WhatsApp notify HTTP ' + response.getResponseCode() + ' (row ' + rowIndex + ')');
+  } catch (err) {
+    Logger.log('[Enrollment] _notifyAutomationNewSubmit error: ' + err.message);
+  }
+}
+
+function _isUrlConfigured() {
+  return AUTOMATION_WEB_APP_URL &&
+         AUTOMATION_WEB_APP_URL.indexOf('PASTE_YOUR') !== 0 &&
+         AUTOMATION_WEB_APP_URL.indexOf('https://') === 0;
+}
